@@ -1,0 +1,23 @@
+{
+  "csv_file": "vendas.csv",
+  "id_field": "id",
+  "check_interval": 2,
+  "last_id": 0,
+  "log_level": "INFO",
+  "log_file": "bot_vendas.log",
+  "database": "bot_vendas.db",
+  "message_template": "🛒 *Nova venda registrada!*\nID: {id}\nProduto: {produto}\nQuantidade: {quantidade}\nValor: R$ {valor}\nCliente: {cliente}",
+  "evolution_api": {
+    "base_url": "http://localhost:8080",
+    "instance": "vendas",
+    "api_key": "CHANGE_ME",
+    "recipient": "5511999999999",
+    "dry_run": true,
+    "timeout": 10
+  },
+  "dashboard": {
+    "enabled": true,
+    "host": "0.0.0.0",
+    "port": 5000
+  }
+}

@@ -2,40 +2,40 @@
 
 ## Cursor Cloud specific instructions
 
-### Current repository state
+### Project overview
 
-As of this environment setup, the repository is **empty of application code**. It
-contains only `.gitignore` (a standard Python template with a few custom entries such
-as `vendas.csv`, `estoque.xlsx`, and `config.json`, hinting at a future Python
-sales/inventory project). There is:
+`bot-vendas/` is a Python service that continuously monitors a sales file
+(`vendas.csv` or `.xlsx`) and sends a WhatsApp message via the **Evolution API**
+for every new sale. It deduplicates via SQLite, persists the last processed ID in
+`config.json`, exposes a Flask **web dashboard**, and has logging + error handling.
+See `bot-vendas/README.md` for full setup, configuration, and usage.
 
-- No application source code
-- No dependency manifest (`requirements.txt`, `pyproject.toml`, `Pipfile`, etc.)
-- No README, tests, or build configuration
+### Services and how to run them
 
-There is therefore nothing to build, run, or test yet. A meaningful application
-"hello world" is not possible until source code and a dependency manifest are added.
+Run everything from inside `bot-vendas/`.
 
-### Toolchain available in the environment
+- **Bot (monitor + dashboard):** `python3 main.py` (add `--no-dashboard` for headless).
+  Dashboard serves on `http://localhost:5000` (`config.json` → `dashboard.port`).
+- **Tests:** `python3 -m pytest` (config in `bot-vendas/pytest.ini`).
+- **Mock Evolution API (for end-to-end testing without a real instance):**
+  `python3 tests/mock_evolution_api.py --port 8081 --out tests/received_messages.jsonl`
+  — records every message it receives and serves them at `GET /messages`.
 
-- Python 3.12.3 (`python3`, `pip` 24.0, `venv` module available; pip is **not**
-  externally-managed, so `pip install` into the system interpreter works)
-- Node.js 22.14.0 (`node`, `npm`) — available via nvm
-- `make`
-- Docker is **not** installed
-- `uv`, `poetry`, and `pipenv` are **not** installed
+### Non-obvious gotchas
 
-### Update script
-
-The startup update script installs Python dependencies only if a manifest exists, so
-it safely no-ops on the current empty repo:
-
-```
-if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
-```
-
-When real code and a dependency manifest are added, revisit this update script (and
-this file) to match the actual stack — e.g. add `pip install -e .` for a
-`pyproject.toml`, or `npm install` if a `package.json` is introduced. Prefer a
-virtualenv (`python3 -m venv .venv`) once the project has real dependencies.
+- `config.json`, `vendas.csv`, `bot_vendas.db`, and `*.log` are **runtime files**
+  and are gitignored. On a fresh checkout there is no `config.json`/`vendas.csv`:
+  create them with `cp config.example.json config.json` and
+  `cp vendas.example.csv vendas.csv`. `config.py` also auto-creates a default
+  `config.json` on first run if missing.
+- `config.json` is **both config and state**: the app writes `last_id` back to it.
+  Deleting `bot_vendas.db` but leaving `last_id` set will skip re-notifying old
+  sales; reset both together for a clean run (`rm bot_vendas.db` + set `last_id: 0`).
+- Deduplication source of truth is the SQLite `sales` table, so re-writing or
+  re-scanning the CSV never resends notifications.
+- Keep `evolution_api.dry_run: true` unless real Evolution API credentials are set;
+  in dry-run, messages are only logged (no network). For end-to-end tests, point
+  `evolution_api.base_url` at the mock server and set `dry_run: false`.
+- The monitor uses `watchdog` events **plus** a polling fallback
+  (`check_interval`), so it still works on filesystems that don't deliver inotify
+  events reliably (some container/network volumes).

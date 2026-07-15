@@ -1,0 +1,18 @@
+# Configuração e dados locais (gerados em runtime)
+config.json
+vendas.csv
+estoque.xlsx
+
+# Banco de dados e logs
+*.db
+*.log
+*.log.*
+
+# Artefatos de testes
+tests/received_messages.jsonl
+*.jsonl
+
+# Python
+__pycache__/
+.pytest_cache/
+.venv/
