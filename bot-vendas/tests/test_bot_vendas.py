@@ -1,13 +1,25 @@
 """Testes automatizados do bot de vendas."""
 from __future__ import annotations
 
+import json
 import logging
+import socket
+import time
 
+import requests
+
+from app import BotApplication
 from config import Config
 from database import Database
 from parser import SalesParser
 from watcher import SalesProcessor, Stats, format_message
 from whatsapp import WhatsAppClient
+
+
+def _free_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return sock.getsockname()[1]
 
 
 def _write_csv(path, rows):
@@ -159,3 +171,67 @@ def test_whatsapp_http_send(monkeypatch):
     assert captured["url"] == "http://localhost:8080/message/sendText/vendas"
     assert captured["json"] == {"number": "5511999999999", "text": "oi"}
     assert captured["headers"]["apikey"] == "secret"
+
+
+def test_windows_service_import_is_safe():
+    # Deve importar sem erro mesmo fora do Windows (imports pywin32 protegidos).
+    import windows_service
+
+    assert hasattr(windows_service, "main")
+    assert windows_service._HAS_PYWIN32 is False  # ambiente de CI é Linux
+
+
+def test_app_start_stop_end_to_end(tmp_path):
+    port = _free_port()
+    csv_file = tmp_path / "vendas.csv"
+    _write_csv(csv_file, ["1,Notebook,1,3500,Joao\n", "2,Mouse,2,150,Maria\n"])
+
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "csv_file": str(csv_file),
+                "check_interval": 0.5,
+                "last_id": 0,
+                "log_file": str(tmp_path / "bot.log"),
+                "database": str(tmp_path / "bot.db"),
+                "evolution_api": {"dry_run": True, "recipient": "5511999999999"},
+                "dashboard": {"enabled": True, "host": "127.0.0.1", "port": port},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    app = BotApplication(str(config_path))
+    app.start(with_dashboard=True)
+    try:
+        # Aguarda o painel responder.
+        base = f"http://127.0.0.1:{port}"
+        for _ in range(40):
+            try:
+                if requests.get(f"{base}/health", timeout=1).status_code == 200:
+                    break
+            except requests.RequestException:
+                time.sleep(0.1)
+        else:
+            raise AssertionError("Painel não respondeu a tempo")
+
+        # As duas vendas iniciais devem ter sido processadas (dry-run).
+        for _ in range(40):
+            sales = requests.get(f"{base}/api/sales", timeout=1).json()
+            if len(sales) == 2:
+                break
+            time.sleep(0.1)
+        assert len(sales) == 2
+        assert app.running is True
+    finally:
+        app.stop()
+
+    assert app.running is False
+    # Após parar, o painel não deve mais responder.
+    try:
+        requests.get(f"http://127.0.0.1:{port}/health", timeout=1)
+        responded = True
+    except requests.RequestException:
+        responded = False
+    assert responded is False

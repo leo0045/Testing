@@ -16,3 +16,8 @@ tests/received_messages.jsonl
 __pycache__/
 .pytest_cache/
 .venv/
+
+# PyInstaller
+build/
+dist/
+*.manifest
