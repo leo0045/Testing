@@ -12,10 +12,18 @@ See `bot-vendas/README.md` for full setup, configuration, and usage.
 
 ### Services and how to run them
 
-Run everything from inside `bot-vendas/`.
+Run everything from inside `bot-vendas/`. `app.py` (`BotApplication`) is the shared
+core used by the CLI, GUI, and Windows service — change wiring there, not in three
+places.
 
-- **Bot (monitor + dashboard):** `python3 main.py` (add `--no-dashboard` for headless).
+- **Bot CLI (monitor + dashboard):** `python3 main.py` (add `--no-dashboard`).
   Dashboard serves on `http://localhost:5000` (`config.json` → `dashboard.port`).
+- **GUI (config + operate):** `python3 gui.py` (Tkinter). Configures phone, monitored
+  file, and Evolution API; starts/stops the bot in-process; tails the log file.
+- **Windows service:** `python windows_service.py install|start|stop|remove`
+  (Windows-only; needs `pywin32`).
+- **Build executable:** `python3 build_exe.py` (GUI) or `--service`; or
+  `pyinstaller bot_vendas.spec`.
 - **Tests:** `python3 -m pytest` (config in `bot-vendas/pytest.ini`).
 - **Mock Evolution API (for end-to-end testing without a real instance):**
   `python3 tests/mock_evolution_api.py --port 8081 --out tests/received_messages.jsonl`
@@ -39,3 +47,13 @@ Run everything from inside `bot-vendas/`.
 - The monitor uses `watchdog` events **plus** a polling fallback
   (`check_interval`), so it still works on filesystems that don't deliver inotify
   events reliably (some container/network volumes).
+- **GUI on Linux** needs the system package `python3-tk` (not a pip dependency, so
+  it is NOT in the update script). On Windows/macOS Tkinter ships with Python.
+  Running the GUI requires a display (`DISPLAY`); this VM has one at `:1`.
+- **PyInstaller does not cross-compile:** building on Linux yields a Linux ELF
+  binary (`dist/BotVendas`), not a Windows `.exe`. Produce the `.exe` by running
+  the build on Windows (or Wine). The Linux build is still valid for verifying the
+  packaging/entrypoints.
+- **`windows_service.py` / `pywin32`** only work on Windows; the pywin32 imports are
+  guarded so the module imports safely on Linux (used by a unit test). `pywin32` is
+  marked `sys_platform == "win32"` in `requirements.txt`, so it is skipped on Linux.
