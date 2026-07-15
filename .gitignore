@@ -216,3 +216,20 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Variáveis de Ambiente e Segredos (CRÍTICO)
+.env
+config.json
+*.key
+*.pem
+
+# Arquivos de Dados Locais (Não suba dados de clientes)
+vendas.csv
+estoque.xlsx
+*.log
+
+# IDEs e OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
